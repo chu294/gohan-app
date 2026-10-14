@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ごはん設計</title>
+<meta name="theme-color" content="#0f766e">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f4f7f6;--card:#fff;--ink:#14302b;--sub:#5d726d;--line:#d9e3e0;--ac:#0f766e;--hot:#e8590c;--soft:#e3f1ee;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1917;--card:#16251f;--ink:#e6f1ee;--sub:#93aaa4;--line:#27403a;--ac:#2dd4bf;--hot:#fb923c;--soft:#1b332d}}
+:root[data-theme="dark"]{--bg:#0e1917;--card:#16251f;--ink:#e6f1ee;--sub:#93aaa4;--line:#27403a;--ac:#2dd4bf;--hot:#fb923c;--soft:#1b332d}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;padding-bottom:84px}
+main{max-width:640px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:6px 0 12px}h2{font-size:16px;margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:9}
+nav button{flex:1;border:0;background:none;color:var(--sub);padding:12px 0;font:inherit;font-weight:500}
+nav button.on{color:var(--ac);font-weight:700;box-shadow:inset 0 3px var(--ac)}
+label{display:block;font-size:12px;color:var(--sub);margin-bottom:2px}
+input,select,textarea{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:99px;padding:6px 12px;font:inherit}
+.chip.on{background:var(--ac);border-color:var(--ac);color:var(--bg);font-weight:700}
+.btn{border:0;background:var(--ac);color:var(--bg);border-radius:10px;padding:10px 14px;font:inherit;font-weight:700}
+.btn.s{background:var(--soft);color:var(--ac)}.btn.sm{padding:4px 10px;font-size:13px}
+.big{font-size:30px;font-weight:700;color:var(--hot);line-height:1.1}
+.sub{color:var(--sub);font-size:13px}
+.bar{height:8px;background:var(--soft);border-radius:9px;overflow:hidden;margin:3px 0 8px}.bar i{display:block;height:100%;background:var(--ac)}.bar i.o{background:var(--hot)}
+.meal{display:flex;gap:10px;justify-content:space-between;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.meal:first-of-type{border-top:0}.meal b{display:block}.tag{color:var(--ac);font-weight:700;font-size:12px}
+.done{opacity:.5}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.note{background:var(--soft);border-radius:10px;padding:8px 10px;font-size:13px;margin:8px 0}
+ul{padding-left:18px;margin:4px 0}
+</style></head><body>
+<main><h1 id="ttl">ごはん設計</h1><div id="v"></div></main>
+<nav id="nav"></nav>
+<script>
+// [名前, 種別(b朝/m主食), kcal, P, F, C, タグ(q=お手軽 b=作り置き), 材料]
+const D=[
+["卵かけご飯と味噌汁","b",480,16,12,74,"q",["卵","ご飯","味噌","豆腐"]],
+["納豆ご飯と味噌汁","b",450,18,10,70,"q",["納豆","ご飯","味噌","ねぎ"]],
+["トースト・目玉焼き・ヨーグルト","b",420,20,16,48,"q",["食パン","卵","ヨーグルト"]],
+["オートミール・バナナ・牛乳","b",380,15,8,62,"q",["オートミール","バナナ","牛乳"]],
+["焼き鮭定食(朝)","b",480,26,12,64,"b",["鮭","ご飯","味噌","わかめ"]],
+["ギリシャヨーグルト・果物・グラノーラ","b",360,22,8,50,"q",["ギリシャヨーグルト","果物","グラノーラ"]],
+["ハムチーズサンドとサラダ","b",400,19,17,42,"q",["食パン","ハム","チーズ","レタス"]],
+["おにぎり2個と卵スープ","b",430,14,7,78,"qb",["ご飯","海苔","卵","鶏がら"]],
+["鶏むねの照り焼き定食","m",560,42,10,70,"b",["鶏むね肉","ご飯","ブロッコリー","醤油・みりん"]],
+["鮭の塩焼き定食","m",540,34,14,66,"q",["鮭","ご飯","小松菜","味噌"]],
+["豚の生姜焼き定食","m",680,32,26,72,"q",["豚ロース","生姜","玉ねぎ","ご飯","キャベツ"]],
+["親子丼","m",600,33,14,86,"q",["鶏もも肉","卵","玉ねぎ","ご飯"]],
+["サバの味噌煮定食","m",650,32,24,70,"",["サバ","味噌","ご飯","ほうれん草"]],
+["豆腐ハンバーグ定食","m",560,30,18,66,"b",["豆腐","鶏ひき肉","玉ねぎ","ご飯"]],
+["牛肉と玉ねぎの炒め丼","m",640,30,24,72,"q",["牛薄切り肉","玉ねぎ","ご飯"]],
+["チキンカレー","m",700,28,20,98,"b",["鶏もも肉","じゃがいも","にんじん","玉ねぎ","カレールウ","ご飯"]],
+["肉じゃが定食","m",620,24,16,90,"b",["牛肉","じゃがいも","にんじん","玉ねぎ","ご飯"]],
+["蒸し鶏サラダとおにぎり","m",480,38,8,58,"q",["鶏むね肉","レタス","トマト","ご飯"]],
+["ささみと野菜のうどん","m",520,32,6,84,"q",["ささみ","うどん","ねぎ","白菜"]],
+["ツナと卵のパスタ","m",640,28,20,86,"q",["パスタ","ツナ缶","卵","チーズ"]],
+["麻婆豆腐とご飯","m",640,26,24,76,"q",["豆腐","豚ひき肉","ねぎ","麻婆の素","ご飯"]],
+["鶏そぼろ丼","m",580,32,12,80,"qb",["鶏ひき肉","卵","ご飯","いんげん"]],
+["ミートソースパスタ","m",680,26,20,92,"b",["パスタ","合いびき肉","玉ねぎ","トマト缶"]],
+["豚汁定食","m",600,26,18,78,"b",["豚肉","大根","にんじん","ごぼう","味噌","ご飯"]],
+["鮭と野菜のホイル焼き定食","m",520,34,12,64,"q",["鮭","きのこ","玉ねぎ","ご飯"]],
+["ハンバーグ定食","m",740,34,32,70,"",["合いびき肉","玉ねぎ","ご飯","ブロッコリー"]],
+["チキンと野菜のスープ煮とパン","m",520,36,14,56,"b",["鶏もも肉","キャベツ","にんじん","パン"]],
+["エビと卵のチャーハン","m",620,24,16,90,"q",["エビ","卵","ご飯","ねぎ"]]];
+const SF="2.4/2.5,2.2/5,1.8/2.5,0.2/6,3/3,0.3/3,2.5/3.5,2.3/1.5,2.8/5,3.2/4.5,3/4,2.8/2.5,3.5/4,2.7/5,2.6/3,3/5,3/5,2/4,3/4,2.4/5,3.3/3.5,2.4/3,2.6/6,3.4/6,2.6/5,3/5,2.8/6,2.6/2".split(",");
+D.forEach((d,i)=>{const q=SF[i].split("/");d[8]=+q[0];d[9]=+q[1]});
+const NEW=`バナナヨーグルトとトースト|b|390|16|9|62|q|食パン,バナナ,ヨーグルト|1.3|4
+野菜入りオムレツとトースト|b|430|22|20|40|q|卵,食パン,玉ねぎ,トマト|1.9|3.5
+具だくさん味噌汁とおにぎり|b|420|16|8|72|b|ご飯,味噌,豆腐,わかめ,ねぎ|2.6|4
+プロテインオートミール|b|360|28|7|47|q|オートミール,牛乳,バナナ|0.4|7
+チーズトーストとサラダ|b|410|17|17|46|q|食パン,チーズ,レタス,トマト|2|3.5
+ツナサラダサンド|b|420|21|15|47|q|食パン,ツナ缶,レタス,トマト|1.9|3.5
+卵と野菜のスープとパン|b|380|18|13|45|q|卵,ブロッコリー,にんじん,パン|1.8|4.5
+焼きおにぎりと温野菜|b|400|10|4|82|q|ご飯,醤油,ブロッコリー|1.4|4
+バナナナッツ牛乳スムージー|b|340|14|13|42|q|バナナ,牛乳,ナッツ|0.2|4
+鮭おにぎりと豆腐味噌汁|b|440|20|8|70|b|ご飯,鮭,豆腐,味噌|2.6|3
+グラノーラ・牛乳・果物|b|380|13|9|60|q|グラノーラ,牛乳,果物|0.3|4
+卵サンドとスープ|b|430|19|19|44|q|食パン,卵,マヨネーズ|1.7|2.5
+鯖の塩焼き定食|m|610|30|22|65||サバ,ご飯,大根,味噌|2.8|4.5
+鮭と野菜の味噌ホイル蒸し|m|500|33|12|62|q|鮭,きのこ,キャベツ,ご飯|2|5
+鯖缶と野菜のトマト煮|m|540|28|20|60|q|サバ,トマト缶,玉ねぎ,ご飯|2|5
+鮭のムニエルとサラダ|m|560|33|18|55||鮭,バター,小麦粉,ブロッコリー,ご飯|2|4.5
+エビと野菜の炒め丼|m|540|28|10|82|q|エビ,ピーマン,玉ねぎ,ご飯|2.2|3.5
+エビチリ風とご飯|m|560|27|12|80||エビ,ねぎ,ケチャップ,ご飯|2.6|3
+ツナと野菜の卵とじ丼|m|570|28|14|78|q|ツナ缶,卵,玉ねぎ,ご飯|2.5|3
+鮭チャーハン|m|600|24|15|88|q|ご飯,鮭,卵,ねぎ|2.4|2
+蒸し鶏とブロッコリー定食|m|490|40|6|62|qb|鶏むね肉,ブロッコリー,ご飯|1.6|5
+ささみの梅しそ巻き定食|m|480|36|7|64|q|ささみ,ご飯,大根|1.8|3.5
+鶏むねのトマト煮|m|520|38|11|58|b|鶏むね肉,トマト缶,玉ねぎ,ご飯|2|5
+鶏もも肉の塩麹焼き定食|m|640|32|22|68||鶏もも肉,ご飯,キャベツ|2.6|4
+鶏の南蛮風|m|650|34|22|68||鶏むね肉,卵,玉ねぎ,ご飯|2.6|3.5
+チキンのトマトクリーム煮|m|620|33|22|65|b|鶏もも肉,トマト缶,牛乳,玉ねぎ,ご飯|2.5|4.5
+豚しゃぶサラダ定食|m|560|30|18|62|q|豚ロース,レタス,トマト,ご飯|2.2|4
+豚キャベツ蒸し|m|540|28|20|60|q|豚バラ肉,キャベツ,ご飯|1.8|4.5
+豚と野菜のみそ炒め定食|m|650|28|24|70|q|豚ロース,キャベツ,ピーマン,味噌,ご飯|2.9|4.5
+豚肉と大根の煮物定食|m|600|26|17|75|b|豚バラ肉,大根,ご飯|2.6|4.5
+豚こまと白菜のうま煮丼|m|590|27|16|78|q|豚ロース,白菜,ご飯|2.4|4
+牛肉とごぼうのしぐれ煮丼|m|620|26|18|82|b|牛肉,ごぼう,生姜,ご飯|2.8|4
+ビーフストロガノフ風|m|690|28|26|78||牛肉,玉ねぎ,牛乳,ご飯|2.4|3
+牛肉と野菜のオイスター炒め丼|m|630|28|19|85|q|牛肉,ピーマン,玉ねぎ,ご飯|2.9|3.5
+キーマカレー|m|680|27|22|88|b|ひき肉,玉ねぎ,にんじん,カレールウ,ご飯|2.9|5
+鶏つくねと豆腐の定食|m|560|32|18|62|b|鶏ひき肉,豆腐,ご飯|2.2|4
+ひき肉となすの味噌炒め丼|m|620|24|20|85|q|ひき肉,なす,味噌,ご飯|2.7|4.5
+ロールキャベツ|m|540|26|18|60|b|ひき肉,キャベツ,玉ねぎ,トマト缶|2.2|6
+豆腐と野菜のあんかけ丼|m|520|22|10|84|q|豆腐,にんじん,白菜,ご飯|2.2|4.5
+厚揚げと野菜の味噌炒め定食|m|590|24|20|75|q|厚揚げ,ピーマン,なす,味噌,ご飯|2.6|5
+納豆オムレツ定食|m|560|27|20|65|q|卵,納豆,ご飯,ほうれん草|1.8|5
+天津飯|m|610|24|17|86|q|卵,ご飯,ねぎ|2.5|2
+鶏と野菜の焼きうどん|m|580|28|14|82|q|うどん,鶏もも肉,キャベツ,にんじん|2.8|4
+鮭とほうれん草のクリームパスタ|m|690|30|24|85|q|パスタ,鮭,ほうれん草,牛乳,チーズ|2.2|5
+きのこと鶏のトマトパスタ|m|620|30|14|92|q|パスタ,鶏むね肉,しめじ,トマト缶|2|6
+ツナとブロッコリーのペペロンチーノ|m|620|26|18|88|q|パスタ,ツナ缶,ブロッコリー,にんにく,油|2.2|6
+温玉そば|m|480|22|10|75|q|そば,卵,ねぎ,のり|2.3|4
+冷やし中華(ささみ)|m|520|30|8|85|q|中華麺,ささみ,トマト,もやし|2.8|4
+具だくさん野菜スープとパン|m|470|22|14|62|b|キャベツ,にんじん,玉ねぎ,ウインナー,パン|2|7
+鶏と野菜のポトフ|m|480|32|12|54|b|鶏もも肉,じゃがいも,にんじん,キャベツ|2|6.5
+豚汁と鮭おにぎり|m|610|28|16|85|b|豚肉,大根,にんじん,味噌,ご飯,鮭|3.2|6
+鶏と根菜の煮物定食|m|610|30|16|80|b|鶏もも肉,ごぼう,にんじん,ご飯|2.6|6
+鮭とアボカドのサラダボウル|m|560|28|20|62|q|鮭,アボカド,レタス,ご飯|1.6|6
+鶏むねと野菜のグリル|m|480|40|8|50|q|鶏むね肉,かぼちゃ,ブロッコリー|1.2|6
+鮭と豆腐のヘルシー鍋|m|430|35|11|34|q|鮭,豆腐,白菜,ねぎ|2.4|5`;
+D.push(...NEW.split("\n").map(l=>{const a=l.split("|");return[a[0],a[1],+a[2],+a[3],+a[4],+a[5],a[6],a[7].split(","),+a[8],+a[9]]}));
+const mp=x=>Object.fromEntries(x.split(",").map(y=>{const q=y.split(":");return[q[0],+q[1]]}));
+const SALT=mp("醤油:14.5,味噌:12.4,ラーメンスープ(豚骨):1,ラーメンスープ(醤油):0.9,ベーコン:2,ハム:2.5,ウインナー:1.9,チャーシュー:2.2,ツナ缶:0.9,チーズ:2.8,粉チーズ:3.8,カレールウ:10.6,ケチャップ:3.3,マヨネーズ:1.7,バター:1.5,食パン:1.2,中華麺(生):1,うどん(茹):0.3,のり:1.3,メンマ:2,卵:0.4,トマト缶:0.3,鮭:0.1,サバ:0.3,牛乳:0.1");
+const FIB=mp("パスタ(乾):5.4,中華麺(生):2.1,うどん(茹):0.5,そば(茹):2,食パン:4.2,オートミール:9.4,ご飯(炊):0.3,納豆:6.7,豆腐:0.4,小松菜:1.9,ほうれん草:2.8,舞茸:3.5,しめじ:3,えのき:3.9,しいたけ:4.6,玉ねぎ:1.5,キャベツ:1.8,レタス:1.1,トマト:1,にんじん:2.8,じゃがいも:1.3,ブロッコリー:4.4,もやし:1.3,白菜:1.3,大根:1.4,ねぎ:2.5,ピーマン:2.3,なす:2.2,ごぼう:5.7,かぼちゃ:3.5,アボカド:5.3,バナナ:1.1,のり:36,わかめ:3.6,小麦粉:2.5,ナッツ:10,トマト缶:1.3");
+const PRE=[["ご飯1杯",235,4,0,52],["卵1個",80,7,6,0],["バナナ",90,1,0,23],["プロテイン",120,24,2,3],["コンビニおにぎり",180,4,1,38],["サラダチキン",120,25,2,1],["牛乳200ml",134,7,8,10],["間食(菓子)",200,3,10,25]];
+const ACT={1.2:"ほぼ座り仕事",1.375:"軽い運動(週1-3)",1.55:"中程度(週3-5)",1.725:"活発(ほぼ毎日)"};
+const GO={d:"ダイエット",n:"通常維持",m:"筋力アップ"},MO={q:"お手軽",b:"作り置き",d:"毎日作る"};
+const W=[.25,.35,.4],MN=["朝食","昼食","夕食"];
+const np=()=>({n:"",sex:"f",age:30,h:160,w:55,act:1.375,goal:"n",ex:"",gw:0,gk:0});
+let S=norm(null);
+try{const x=localStorage.getItem("gohan");if(x)S=norm(JSON.parse(x))}catch(e){}
+const save=()=>{try{localStorage.setItem("gohan",JSON.stringify(S))}catch(e){if(!save.w){save.w=1;alert("保存できませんでした。容量不足やプライベートブラウズの可能性があります。バックアップを取ってください。")}}};
+const $=id=>document.getElementById(id);
+const E=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ds=o=>{const d=new Date();d.setDate(d.getDate()+o);return d};
+const key=o=>{const d=ds(o);return d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()};
+const R=a=>Math.round(a);
+function T(p){const b=10*p.w+6.25*p.h-5*p.age+(p.sex=="m"?5:-161);const td=b*p.act;let k=td*(p.goal=="d"?.85:p.goal=="m"?1.1:1),ad=0,wk=0;if(p.gw>0&&p.gk>0&&p.gw!=p.w){const raw=td+(p.gw-p.w)*7200/(p.gk*7);k=Math.min(td*1.2,Math.max(td*.75,raw));ad=Math.abs(raw-k)>1?1:0;wk=Math.abs(p.gw-p.w)*7200/(Math.abs(k-td)||1)/7}k=Math.max(k,p.sex=="m"?1500:1200);
+const pr=p.w*(p.goal=="d"?1.6:p.goal=="m"?1.8:1.2),f=k*.25/9,c=(k-pr*4-f*9)/4;return{b,k,p:pr,f,c,bmi:p.w/Math.pow(p.h/100,2),ad,wk}}
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function shuf(a,r){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function plan(sh=0){const q=S.md.includes("q"),bt=S.md.includes("b"),n0=new Date(),ep=Math.floor(Date.UTC(n0.getFullYear(),n0.getMonth(),n0.getDate())/864e5)+sh;
+const ex=S.p.flatMap(p=>(p.ex||"").split(/[、,，\s]+/).filter(Boolean)),okf=i=>!ex.some(k=>D[i][0].includes(k)||D[i][7].some(g=>g.includes(k))),all=t=>D.map((d,i)=>i).filter(i=>D[i][1]==t),ix=t=>{const a=all(t).filter(okf);return a.length?a:all(t)};
+const tg=(a,c)=>{const x=a.filter(i=>D[i][6].includes(c));return x.length>3?x:a};
+const Bq=q?tg(ix("b"),"q"):ix("b"),Mq=q?tg(ix("m"),"q"):ix("m"),Mb=tg(ix("m"),"b"),Bb=tg(ix("b"),"b");
+const r0=rng(S.seed*977+(S.md.join("")||"d").charCodeAt(0)),Bp=shuf(Bq,r0),Mp=shuf(Mq,r0),out=[];
+for(let o=0;o<7;o++){const n=ep+o;let r;
+if(bt){const w=Math.floor((n+3)/7),d=(n+3)%7,rw=rng(S.seed*977+w),qb=ix("m").filter(i=>D[i][6].includes("q")&&D[i][6].includes("b")),M=shuf(q&&qb.length>=3?qb:Mb,rw).slice(0,3);
+if(q){let dn=Mp[n%Mp.length];if(dn==M[d%3])dn=Mp[(n+1)%Mp.length];r=[Bp[n%Bp.length],M[d%3],dn]}else{const B=shuf(Bb,rw).slice(0,2);r=[B[d%2],M[(2*d)%3],M[(2*d+1)%3]]}}
+else r=[Bp[n%Bp.length],Mp[(2*n)%Mp.length],Mp[(2*n+1)%Mp.length]];out.push(r)}
+const lim=Math.min(...S.p.map(p=>p.sex=="m"?7.5:6.5)),pl=[Bq,bt&&!q?Mb:Mq,bt&&!q?Mb:Mq];
+if(S.ls)out.forEach((r,o)=>{const tot=()=>r.reduce((a,i)=>a+D[i][8],0);for(let g=0;g<3&&tot()>lim;g++){const m=[0,1,2].sort((a,b)=>D[r[b]][8]-D[r[a]][8])[0],c=pl[m].filter(i=>!r.includes(i)&&D[i][8]<D[r[m]][8]-.3).sort((a,b)=>D[a][8]-D[b][8]);if(!c.length)break;r[m]=c[(ep+o+g)%Math.min(4,c.length)]}});
+out.forEach(r=>[0,1,2].forEach(m=>{const j=S.my.findIndex(x=>x.n==S.pin[m]);if(S.pin[m]&&j>=0)r[m]=1000+j}));plan.w=ex.length>0&&["b","m"].some(t=>all(t).filter(okf).length<3);return out}
+function lg(pi,o){return((S.log[key(o)]||{})[pi]||[])}
+function sum(a){return a.reduce((s,x)=>({k:s.k+x.k,p:s.p+x.p,f:s.f+x.f,c:s.c+x.c,s:s.s+(x.s||0),fb:s.fb+(x.fb||0)}),{k:0,p:0,f:0,c:0,s:0,fb:0})}
+function targets(pi,o){const t=T(S.p[pi]);const ea=((S.eaten[key(o)]||{})[pi])||{};
+if(o!=0)return W.map(w=>t.k*w);
+const rem=Math.max(0,t.k-sum(lg(pi,0)).k);const un=[0,1,2].filter(m=>!ea[m]);const tw=un.reduce((s,m)=>s+W[m],0)||1;
+return[0,1,2].map(m=>ea[m]?0:rem*W[m]/tw)}
+function scale(d,tk){return Math.min(2,Math.max(.5,tk/d[2]))}
+const pfc=(p,f,c)=>`たんぱく質${R(p)}g・脂質${R(f)}g・炭水化物${R(c)}g`;
+function amt(x,f){const g=[];if(x[7].includes("ご飯"))g.push("ご飯"+R(150*f/5)*5+"g");else if(x[7].includes("パスタ"))g.push("パスタ乾麺"+R(90*f/5)*5+"g");else if(x[7].includes("うどん"))g.push("うどん"+R(220*f/10)*10+"g");return"量×"+f.toFixed(1)+(g.length?"（"+g[0]+"）":"")}
+function prune(){const n=new Date(),now=new Date(n.getFullYear(),n.getMonth(),n.getDate());const age=k=>{const q=k.split("-");return(now-new Date(q[0],q[1]-1,q[2]))/864e5};
+for(const k of Object.keys(S.log))if(age(k)>60){S.hist[k]=S.hist[k]||{};for(const pi in S.log[k]){const t=sum(S.log[k][pi]);S.hist[k][pi]={k:R(t.k),p:R(t.p),f:R(t.f),c:R(t.c),s:+t.s.toFixed(1),fb:+t.fb.toFixed(1)}}delete S.log[k]}
+for(const k of Object.keys(S.eaten))if(age(k)>60)delete S.eaten[k];
+for(const k of Object.keys(S.hist))if(age(k)>800)delete S.hist[k];for(const k of Object.keys(S.ov))if(age(k)>2)delete S.ov[k]}
+const bar=(l,v,t,u)=>`<div class="row sub"><span>${l}</span><span>${R(v)} / ${R(t)}${u}</span></div><div class="bar"><i class="${v>t*1.1?'o':''}" style="width:${Math.min(100,v/t*100)}%"></i></div>`;
+function nav(){$("nav").innerHTML=["設定","献立","記録","料理","買い物"].map((t,i)=>`<button class="${S.tab==i?'on':''}" onclick="S.tab=${i};save();go()">${t}</button>`).join("")}
+function go(){nav();[vSet,vPlan,vLog,vCook,vShop][S.tab]();window.scrollTo(0,0)}
+function who(){return S.p.length<2?"":`<div class="chips">${S.p.map((p,i)=>`<button class="chip ${S.cur==i?'on':''}" onclick="S.cur=${i};save();go()">${E(p.n||'人'+(i+1))}</button>`).join("")}</div>`}
+// 設定
+function dropP(i){if(!confirm("この人の記録も削除されます。よろしいですか？"))return;S.p.splice(i,1);S.cur=0;for(const st of[S.log,S.eaten,S.hist,S.wt])for(const k in st){const o=st[k],n={};for(const j in o){const q=+j;if(q<i)n[q]=o[j];else if(q>i)n[q-1]=o[j]}st[k]=n}save();vSet()}
+function U(i,k,v){const RG={age:[3,110],h:[80,230],w:[15,250],gw:[0,250],gk:[0,104]};if(RG[k]){v=+v;if(!(v>=RG[k][0]&&v<=RG[k][1])){alert("入力範囲を確認してください（年齢3〜110、身長80〜230cm、体重15〜250kg）");vSet();return}}S.p[i][k]=["n","sex","goal","ex"].includes(k)?v:+v;save();if(["act","goal","sex","gw","gk","w","h","age"].includes(k))vSet()}
+function vSet(){let h=S.p.map((p,i)=>{const t=T(p);return`<div class="card"><div class="row"><h2>${i?'家族・パートナー '+i:'あなた'}</h2>${i?`<button class="btn s sm" onclick="dropP(${i})">削除</button>`:''}</div>
+<div class="g"><div><label>名前</label><input value="${E(p.n)}" onchange="U(${i},'n',this.value)"></div>
+<div><label>性別</label><select onchange="U(${i},'sex',this.value)"><option value="f" ${p.sex=='f'?'selected':''}>女性</option><option value="m" ${p.sex=='m'?'selected':''}>男性</option></select></div></div>
+<div class="g3" style="margin-top:8px"><div><label>年齢</label><input type="number" inputmode="numeric" value="${p.age}" onchange="U(${i},'age',this.value)"></div>
+<div><label>身長cm</label><input type="number" inputmode="decimal" value="${p.h}" onchange="U(${i},'h',this.value)"></div>
+<div><label>体重kg</label><input type="number" inputmode="decimal" value="${p.w}" onchange="U(${i},'w',this.value)"></div></div>
+<label style="margin-top:8px">活動量</label><select onchange="U(${i},'act',this.value)">${Object.entries(ACT).map(([k,v])=>`<option value="${k}" ${p.act==k?'selected':''}>${v}</option>`).join("")}</select>
+<label style="margin-top:8px">目的</label><div class="chips" style="margin:0">${Object.entries(GO).map(([k,v])=>`<button class="chip ${p.goal==k?'on':''}" onclick="U(${i},'goal','${k}')">${v}</button>`).join("")}</div>
+<div class="g" style="margin-top:8px"><div><label>目標体重kg（任意）</label><input type="number" inputmode="decimal" value="${p.gw||''}" onchange="U(${i},'gw',this.value)"></div><div><label>達成期間（週）</label><input type="number" inputmode="numeric" value="${p.gk||''}" onchange="U(${i},'gk',this.value)"></div></div><label style="margin-top:8px">苦手・アレルギー食材（「、」区切り／献立から除外）</label><input value="${E(p.ex||'')}" placeholder="例：えび、卵" onchange="U(${i},'ex',this.value)"><div class="sub">※アレルギーは調味料・加工品の原材料表示も必ず確認してください。</div><div class="note">1日の目安 <b>${R(t.k)} kcal</b>｜たんぱく質 ${R(t.p)}g・脂質 ${R(t.f)}g・炭水化物 ${R(t.c)}g<br>BMI ${t.bmi.toFixed(1)}／基礎代謝 ${R(t.b)} kcal${p.gw&&p.gk?'<br>目標：'+p.gw+'kg／'+p.gk+'週'+(t.ad?'（期間が短いため安全な範囲に調整。達成は約'+R(t.wk)+'週後）':''):''}${t.bmi<18.5&&p.goal=="d"?'<br><b>BMIが低めです。減量は推奨されません。</b>':''}${p.age<18?'<br><b>18歳未満は成長期のため参考程度にし、医師などに相談してください。</b>':''}</div></div>`}).join("");
+h+=`<button class="btn s" onclick="S.p.push(np());save();vSet()" style="width:100%;margin-bottom:12px">＋ 家族・パートナーを追加</button>
+<div class="card"><h2>作り方スタイル（複数選択OK）</h2><div class="chips">${[["q","お手軽"],["b","作り置き"]].map(([k,v])=>`<button class="chip ${S.md.includes(k)?'on':''}" onclick="tgM('${k}')">${v}</button>`).join("")}<button class="chip ${S.ls?'on':''}" onclick="S.ls=!S.ls;save();vSet()">減塩優先</button></div>
+<div class="sub">・両方OFF＝毎日違うメニュー（バリエーション重視）<br>・お手軽＝短時間で作れるメニューのみ<br>・作り置き＝週に3品を繰り返し使う（月曜〜日曜で入れ替え）<br>・両方ON＝朝食と夕食はお手軽、昼食は週3品の作り置き<br>・減塩優先＝1日の塩分が上限（男性7.5g・女性6.5g。家族は低い方）を超える日は、塩分の少ない料理に差し替え</div></div><div class="card"><h2>固定メニュー（マイ料理）</h2><div class="sub">朝食などを毎日同じマイ料理にできます。</div>${MN.map((n,m)=>`<label style="margin-top:6px">${n}</label><select onchange="S.pin[${m}]=this.value;save()"><option value="">固定しない</option>${S.my.map(x=>`<option value="${E(x.n)}" ${S.pin[m]==x.n?'selected':''}>${E(x.n)}</option>`).join("")}</select>`).join("")}</div>
+<div class="card"><h2>用語と量の目安</h2><ul class="sub"><li><b>kcal</b>：エネルギーの量。食べ過ぎ・不足の目安です。</li><li><b>たんぱく質(P)</b>：筋肉・肌・髪の材料。肉・魚・卵・大豆・乳製品に多い。</li><li><b>脂質(F)</b>：エネルギー源でホルモンの材料。油・肉の脂身・ナッツに多い。</li><li><b>炭水化物(C)</b>：主なエネルギー源。ご飯・パン・麺・芋・果物。</li><li>g（グラム）は重さ。ざっくりで十分です。</li></ul><div class="note">量の目安：<br>・ご飯 茶碗1杯＝約150g（235kcal）<br>・手のひら1枚（指を除く）＝肉・魚 約100g<br>・両手に山盛り＝野菜 約300g<br>・「×1.0」＝標準1人前、「×0.8」＝2割少なめ。はかりが無くても、見た目で増減すればOKです。</div></div>
+<div class="card"><h2>バックアップ</h2><div class="sub">機種変更やURL変更の前に「書き出す」で文字列を保管し、新しい端末で貼り付けて「読み込む」と引き継げます。</div><textarea id="bk" rows="3" style="margin:6px 0"></textarea><div class="g"><button class="btn s" onclick="bkOut()">書き出す（コピー）</button><button class="btn s" onclick="bkIn()">読み込む</button></div><div class="g" style="margin-top:8px"><button class="btn s" onclick="bkFile()">ファイルに保存</button><label class="btn s" style="text-align:center;font-size:15px;color:var(--ac);margin:0">ファイルから読込<input type="file" accept=".json" style="display:none" onchange="bkF(this)"></label></div></div><div class="card"><h2>保存データ</h2><div class="sub">現在 約${Math.ceil(JSON.stringify(S).length/1024)}KB。60日より前の記録は自動で「1日の合計」だけに要約し、約2年より前は削除するので、容量は増え続けません。</div><button class="btn s" style="margin-top:8px" onclick="wipe()">全データを削除</button></div>
+<p class="sub">数値はMifflin-St Jeor式による目安です。持病や妊娠中・成長期などは医師・管理栄養士に相談してください。データはこの端末内にのみ保存されます。</p>`;$("v").innerHTML=h}
+// 献立
+function vPlan(){const P=planO(),pi=Math.min(S.cur,S.p.length-1);const t=T(S.p[pi]);
+let h=who()+`<div class="chips">${[1,3,5,7].map(n=>`<button class="chip ${S.days==n?'on':''}" onclick="S.days=${n};save();vPlan()">${n}日</button>`).join("")}<button class="chip" onclick="S.seed++;save();vPlan()">🔄 作り直す</button></div>
+${plan.w?'<div class="note">除外食材が多く選択肢が少ないため、除外食材が含まれる可能性があります。</div>':''}<div class="sub" style="margin-bottom:8px">${E(S.p[pi].n||'あなた')}：目標 ${R(t.k)} kcal（${GO[S.p[pi].goal]}）／量は人ごとに自動調整。×1.0＝標準的な1人前（定食屋さんの1人前くらい）</div>`;
+for(let o=0;o<S.days;o++){const tg=targets(pi,o),d=ds(o),ea=((S.eaten[key(o)]||{})[pi])||{};let tot=0,sl=0;
+const rows=P[o].map((di,m)=>{const x=dd(di),f=scale(x,tg[m]||t.k*W[m]),k=x[2]*f;if(!ea[m])tot+=k;sl+=(x[8]||0)*f;
+return`<div class="meal ${ea[m]?'done':''}"><div><span class="tag">${MN[m]}</span><b>${x[0]}</b><span class="sub">${amt(x,f)}｜${R(k)}kcal<br>${pfc(x[3]*f,x[4]*f,x[5]*f)}・塩分${((x[8]||0)*f).toFixed(1)}g</span></div>
+<div style="display:grid;gap:4px">${o==0?(ea[m]?`<span class="sub">記録済</span>`:`<button class="btn s sm" onclick="eat(${pi},${m},${di},${f})">食べた</button>`):''}${ea[m]?'':`<button class="btn s sm" onclick="sw(${o},${m})">変更</button>`}${(S.ov[key(o)]||{})[m]!=null?`<button class="btn s sm" onclick="swr(${o},${m})">戻す</button>`:''}</div></div>`}).join("");
+const lo=lg(pi,o==0?0:99).length&&o==0?sum(lg(pi,0)).k:0;
+h+=`<div class="card"><div class="row"><h2>${o==0?'今日':(d.getMonth()+1)+'/'+d.getDate()+'('+"日月火水木金土"[d.getDay()]+')'}</h2><span class="sub">${o==0?`摂取済 ${R(lo)} + 残り献立 ${R(tot)}`:`合計 ${R(tot)} kcal`}</span></div><div class="sub" style="color:${sl>(S.p[pi].sex=="m"?7.5:6.5)?'var(--hot)':'var(--sub)'}">塩分 約${sl.toFixed(1)}g（上限 ${S.p[pi].sex=="m"?7.5:6.5}g）</div>${rows}
+${o==0&&targets(pi,0).every(x=>x==0)?'<div class="note">今日の献立はすべて記録済みです。</div>':''}</div>`}
+$("v").innerHTML=h}
+function eat(pi,m,di,f){const x=dd(di),k=key(0);S.log[k]=S.log[k]||{};S.log[k][pi]=S.log[k][pi]||[];
+S.log[k][pi].push({n:x[0],m:m,pl:1,k:x[2]*f,p:x[3]*f,f:x[4]*f,c:x[5]*f,s:(x[8]||0)*f,fb:(x[9]||0)*f});S.eaten[k]=S.eaten[k]||{};S.eaten[k][pi]=S.eaten[k][pi]||{};S.eaten[k][pi][m]=1;save();vPlan()}
+// 記録
+function add(pi,e,pre){if(pre){const a=S.amt;e.k*=a;e.p*=a;e.f*=a;e.c*=a;e.s=(e.s||0)*a;e.fb=(e.fb||0)*a;if(a!=1)e.n+="("+AL[a]+")"}e.m=S.rm;const k=key(0);S.log[k]=S.log[k]||{};S.log[k][pi]=S.log[k][pi]||[];S.log[k][pi].push(e);save();vLog()}
+function addF(){const g=i=>+$(i).value||0,n=$("fn").value.trim();if(!n||!g("fk"))return alert("名前とkcalを入力してください");if($("fs").checked){S.my=S.my.filter(x=>x.n!=n);S.my.push({n,k:g("fk"),p:g("fp"),f:g("ff"),c:g("fc")})}add(Math.min(S.cur,S.p.length-1),{n,k:g("fk"),p:g("fp"),f:g("ff"),c:g("fc")})}
+function del(pi,i){const a=S.log[key(0)][pi],e=a.splice(i,1)[0];if(e&&e.pl&&e.m!=null){const x=(S.eaten[key(0)]||{})[pi];if(x)delete x[e.m]}save();vLog()}
+const AL={0.5:"半分",0.7:"少なめ",1:"普通",1.3:"多め",2:"2倍"},MN4=["朝食","昼食","夕食","間食"];
+function dayTot(pi,o){const k=key(-o),a=(S.log[k]||{})[pi];if(a)return sum(a).k;const h=(S.hist[k]||{})[pi];return h?h.k:0}
+function vLog(){const pi=Math.min(S.cur,S.p.length-1),t=T(S.p[pi]),a=lg(pi,0),s=sum(a),rem=t.k-s.k;
+let adv=[];if(!a.length)adv.push("まだ記録がありません。献立の「食べた」か下のフォームから追加しましょう。");
+else{if(rem<0)adv.push(`目標を約${R(-rem)}kcal超えています。次の食事は軽め（汁物・野菜中心）がおすすめ。献立タブで自動調整されます。`);
+else adv.push(`あと約${R(rem)}kcal。献立タブの残り食事の量が自動で調整されます。`);
+if(s.p<t.p*.7&&a.length>1)adv.push(`たんぱく質が不足気味（あと${R(t.p-s.p)}g）。卵・納豆・ヨーグルト・サラダチキンを足すと◎。`);
+if(s.f>t.f*1.2)adv.push("脂質が多めです。揚げ物や脂身を控えめに。")}
+const dd=[1,2,3,4,5,6,7].map(o=>dayTot(pi,o)).filter(x=>x>0),avg=dd.length?R(dd.reduce((x,y)=>x+y,0)/dd.length):0;
+const grp=MN4.map((nm,m)=>{const es=a.map((e,i)=>[e,i]).filter(([e])=>(e.m==null?3:e.m)==m);if(!es.length)return"";const ms=sum(es.map(x=>x[0]));
+return`<div class="tag" style="margin-top:8px">${nm}　${R(ms.k)}kcal</div>`+es.map(([e,i])=>`<div class="meal"><div><b>${E(e.n)}</b><span class="sub">${R(e.k)}kcal・${pfc(e.p,e.f,e.c)}</span></div><button class="btn s sm" onclick="del(${pi},${i})">削除</button></div>`).join("")}).join("");
+$("v").innerHTML=who()+`<div class="card"><h2>今日の摂取</h2><div class="big">${R(s.k)}<span class="sub"> / ${R(t.k)} kcal</span></div>
+${bar("カロリー",s.k,t.k,"kcal")}${bar("たんぱく質",s.p,t.p,"g")}${bar("脂質",s.f,t.f,"g")}${bar("炭水化物",s.c,t.c,"g")}${s.s>0||s.fb>0?bar("塩分（上限の目安）",s.s,S.p[pi].sex=="m"?7.5:6.5,"g")+bar("食物繊維",s.fb,S.p[pi].sex=="m"?22:18,"g")+'<div class="sub">※塩分・食物繊維は献立・料理計算で入れた分の概算です。</div>':''}
+${adv.map(x=>`<div class="note">${x}</div>`).join("")}${avg?`<div class="sub">直近7日の平均：${avg}kcal／日</div>`:''}</div>
+${weekCard(pi,t)}${kcCard(pi,t)}${wtCard(pi)}<div class="card"><h2>食べたもの</h2>${grp||'<div class="sub">なし</div>'}</div>
+<div class="card"><h2>記録する</h2><label>どの食事？</label><div class="chips">${MN4.map((n,m)=>`<button class="chip ${S.rm==m?'on':''}" onclick="S.rm=${m};save();vLog()">${n}</button>`).join("")}</div>
+<label>量（かんたん追加用）</label><div class="chips">${[0.5,0.7,1,1.3,2].map(v=>`<button class="chip ${S.amt==v?'on':''}" onclick="S.amt=${v};save();vLog()">${AL[v]}</button>`).join("")}</div>
+<div class="chips">${PRE.map(p=>`<button class="chip" onclick="add(${pi},{n:'${p[0]}',k:${p[1]},p:${p[2]},f:${p[3]},c:${p[4]}},1)">${p[0]}</button>`).join("")}</div>
+${S.my.length?`<label style="margin-top:8px">マイ料理（最近の8件）</label><div class="chips">${S.my.map((x,i)=>[x,i]).slice(-8).reverse().map(([x,i])=>`<button class="chip" onclick="addMy(${i})">${E(x.n)}</button>`).join("")}</div>`:''}
+<label style="margin-top:8px">料理名で探す・直接入力</label><input id="fn" placeholder="例：プロテイングラノーラ" oninput="sug()"><div id="sg"></div>
+<div class="g" style="margin-top:6px"><input id="fk" type="number" inputmode="numeric" placeholder="kcal"><input id="fp" type="number" inputmode="decimal" placeholder="たんぱく質g"><input id="ff" type="number" inputmode="decimal" placeholder="脂質g"><input id="fc" type="number" inputmode="decimal" placeholder="炭水化物g"></div>
+<div class="sub" style="margin-top:4px">市販品は袋や容器の「栄養成分表示」を見ると正確です。外食はおおよそで構いません。</div>
+<label style="display:flex;gap:6px;align-items:center;color:var(--ink);font-size:14px;margin-top:6px"><input id="fs" type="checkbox" style="width:auto">マイ料理にも保存</label><button class="btn" style="margin-top:8px;width:100%" onclick="addF()">${MN4[S.rm]}に追加</button><div class="sub" style="margin-top:6px">栄養が分からない料理は「料理」タブで食材から計算できます。</div></div>
+<details class="card"><summary><b>量の見積もりかた</b></summary><div class="sub" style="margin-top:6px">手のひら1枚＝肉・魚100g（約150〜200kcal）／こぶし1個＝ご飯150g（235kcal）／両手山盛り＝野菜300g／親指1本＝油・マヨネーズ小さじ1〜2。1食ずつ正確でなくても、1週間の平均が合っていれば十分です。</div></details>`}
+// 料理計算
+const DBR=`ご飯(炊)|156|2.5|0.3|37.1|150|ご飯,ごはん,白米,米
+パスタ(乾)|378|13|1.8|73|90|パスタ,スパゲッティ,スパゲティ
+中華麺(生)|281|8.6|1.2|55|110|中華麺,ラーメン麺,麺
+うどん(茹)|95|2.6|0.4|21.6|220|うどん
+そば(茹)|130|4.8|1|26|200|そば
+食パン|248|8.9|4.1|46.7|60|パン,トースト
+オートミール|380|13.7|5.7|69|40|
+鶏むね肉|108|22.3|1.5|0|100|むね肉,鶏むね,とりむね
+鶏もも肉|204|16.6|14.2|0|100|もも肉,鶏もも,チキン,鶏肉
+ささみ|98|23|0.8|0|60|
+豚ロース|263|19.3|19.2|0.2|100|豚肉,豚こま
+豚バラ肉|386|14.2|34.6|0.1|60|豚バラ,バラ肉
+牛肉|250|17|19|0.3|80|牛薄切り,牛こま
+ひき肉|237|17.3|18|0.3|80|合いびき,合挽き,豚ひき,鶏ひき,ミンチ
+ベーコン|405|12.9|39.1|0.3|30|
+ハム|196|16.5|13.9|1.3|30|
+ウインナー|321|13.2|28.5|3|40|ソーセージ
+チャーシュー|172|19|9|3|40|焼豚,叉焼
+鮭|133|22.3|4.1|0.1|80|サケ,さけ,サーモン
+サバ|202|20.6|12.1|0.3|80|さば,鯖
+ツナ缶|265|17.7|21.7|0.1|70|ツナ
+エビ|82|18.4|0.6|0.3|60|えび,海老
+卵|151|12.3|10.3|0.3|50|たまご,玉子,生卵,温泉卵
+豆腐|73|7|4.9|1.5|150|木綿豆腐,絹豆腐
+納豆|190|16.5|10|12.1|45|
+厚揚げ|150|10.7|11.3|0.9|100|
+チーズ|339|22.7|26|1.3|20|スライスチーズ,ピザ用チーズ
+粉チーズ|475|44|30.8|1.9|10|パルメザン
+牛乳|67|3.3|3.8|4.8|200|
+生クリーム|433|2|45|3|30|
+ヨーグルト|62|3.6|3|4.9|100|
+バター|700|0.6|81|0.2|10|
+小松菜|14|1.5|0.2|2.4|50|
+ほうれん草|20|2.2|0.4|3.1|50|
+舞茸|16|2|0.5|4.4|50|まいたけ
+しめじ|26|2.7|0.6|4.8|50|
+えのき|34|2.7|0.2|7.6|50|えのき茸
+しいたけ|25|3|0.4|6|30|椎茸
+玉ねぎ|37|1|0.1|8.8|50|たまねぎ,タマネギ
+キャベツ|21|1.3|0.2|5.2|80|
+レタス|12|0.6|0.1|2.8|40|
+トマト|19|0.7|0.1|4.7|80|ミニトマト
+にんじん|37|0.7|0.2|8.7|40|人参
+じゃがいも|59|1.8|0.1|13.1|100|ジャガイモ,じゃが芋
+ブロッコリー|33|4.3|0.5|5.2|60|
+もやし|14|1.7|0.1|2.6|60|
+白菜|13|0.8|0.1|3.2|80|
+大根|15|0.5|0.1|2.7|60|
+ねぎ|28|1.4|0.1|6.6|15|長ねぎ,ネギ,青ねぎ
+ピーマン|22|0.9|0.2|5.1|30|パプリカ
+なす|18|1.1|0.1|4.7|60|ナス,茄子
+ごぼう|58|1.8|0.1|15.4|40|
+かぼちゃ|78|1.9|0.3|17.1|80|
+アボカド|187|2.5|18.7|6.2|70|
+バナナ|93|1.1|0.2|22.5|100|
+メンマ|25|1|0.5|5|20|
+のり|297|41|3.7|44|3|海苔,焼きのり
+わかめ|11|1.5|0.2|2|20|
+にんにく|134|6|0.9|28|5|ニンニク
+生姜|28|0.9|0.3|6.6|5|しょうが,ショウガ
+油|921|0|100|0|10|サラダ油,オリーブ油,オリーブオイル,ごま油
+砂糖|384|0|0|99|5|
+醤油|71|7.7|0|10|15|しょうゆ
+味噌|192|12.5|6|21.9|15|みそ
+みりん|241|0.3|0|43|15|
+マヨネーズ|703|1.5|76|4.5|10|マヨ
+ケチャップ|119|1.7|0.2|27|15|
+カレールウ|505|6|35|45|20|
+トマト缶|21|0.9|0.2|4.4|100|カットトマト
+小麦粉|368|8.3|1.5|76|10|
+片栗粉|330|0|0|81|5|
+ラーメンスープ(豚骨)|67|3|4.7|2.7|300|豚骨スープ,とんこつスープ
+ラーメンスープ(醤油)|40|3|1.5|4|300|醤油スープ
+ナッツ|600|20|54|20|20|アーモンド,くるみ`;
+const DB=DBR.split("\n").map(l=>{const a=l.split("|");return{n:a[0],d:a.slice(1,5).map(Number),g:+a[5],al:(a[6]||"").split(",").filter(Boolean)}});
+const BASE=`カルボナーラ/クリームパスタ:パスタ(乾)90,卵50,粉チーズ10,生クリーム30,油5
+ミートソース/ボロネーゼ:パスタ(乾)90,ひき肉60,玉ねぎ50,トマト缶100,油5
+ペペロン:パスタ(乾)90,油15,にんにく5
+ナポリタン:パスタ(乾)90,ウインナー30,玉ねぎ40,ピーマン20,ケチャップ30,油8
+博多ラーメン/豚骨/とんこつ:中華麺(生)110,ラーメンスープ(豚骨)300,ねぎ10
+ラーメン:中華麺(生)110,ラーメンスープ(醤油)300,ねぎ10
+親子丼:ご飯(炊)250,鶏もも肉80,卵100,玉ねぎ50,醤油15,みりん15,砂糖5
+牛丼:ご飯(炊)250,牛肉80,玉ねぎ80,醤油15,みりん15,砂糖8
+カレー:ご飯(炊)200,カレールウ20,玉ねぎ60,じゃがいも60,にんじん30,油5
+肉じゃが:牛肉60,じゃがいも120,玉ねぎ60,にんじん30,醤油15,砂糖8,みりん10
+チャーハン/炒飯:ご飯(炊)200,卵50,油10,ねぎ10,醤油5
+焼きそば:中華麺(生)110,豚バラ肉40,キャベツ60,油5,ケチャップ10,醤油10
+生姜焼き:豚ロース100,玉ねぎ50,生姜5,醤油15,みりん15,砂糖3,油5
+ハンバーグ:ひき肉120,玉ねぎ40,卵10,牛乳15,食パン10,油5,ケチャップ15
+唐揚げ/から揚げ:鶏もも肉100,片栗粉10,小麦粉10,油15,醤油10
+餃子:ひき肉40,キャベツ40,小麦粉40,油5
+麻婆豆腐:豆腐150,ひき肉50,ねぎ20,油8,味噌10,砂糖3,片栗粉3
+野菜炒め:キャベツ80,もやし50,にんじん20,豚バラ肉40,油8
+味噌汁:味噌12,ねぎ5
+オムライス:ご飯(炊)200,卵100,鶏もも肉40,玉ねぎ30,ケチャップ30,油8
+うどん:うどん(茹)250,ねぎ10,醤油10
+照り焼き:鶏もも肉100,醤油15,みりん15,砂糖5,油3`.split("\n").map(l=>{const[a,b]=l.split(":");return{k:a.split("/"),i:b.split(",").map(x=>{const m=x.match(/^(.*?)(\d+)$/);return[m[1],+m[2]]})}});
+let CX=null;const W4=[.25,.35,.4,.1];
+function find(t){let b=null,bl=0;for(const x of S.mi.concat(DB))for(const nm of[x.n,...(x.al||[])]){if(t==nm)return x;if(nm.length>1&&t.length>1&&(t.includes(nm)||nm.includes(t))&&nm.length>bl){b=x;bl=nm.length}}return b}
+function addTok(t,rows,sv=1){const m=t.match(/^(.*?)(\d+(?:\.\d+)?)\s*(g|ｇ|グラム|個|枚|本|切れ|杯)?$/),n=m&&m[1]?m[1].trim():t,q=m&&m[1]?+m[2]:0,u=m&&m[1]?m[3]||"":"",x=find(n);
+if(!x){rows.push({n:t,g:0,tot:[0,0,0,0]});return}
+const g=q?(/^(g|ｇ|グラム)$/.test(u)?q:q*x.g):x.g*sv,ex=rows.find(r=>r.n==x.n);if(ex)ex.g=g;else rows.push({n:x.n,g,d:x.d})}
+function calc(){let nm=$("dn").value.trim(),ing=$("di").value.trim();const pm=nm.match(/^(.*?)[（(](.*)[）)]$/);if(pm){nm=pm[1].trim();ing=pm[2]+(ing?"、"+ing:"")}
+if(!nm&&!ing)return alert("料理名か食材を入力してください");
+const sv=Math.max(1,Math.min(20,+$("dv").value||1)),rows=[],b=BASE.find(x=>x.k.some(k=>nm.includes(k)));
+if(b)b.i.forEach(([n,g])=>{const x=DB.find(y=>y.n==n);rows.push({n:x.n,g:g*sv,d:x.d,b:1})});
+ing.split(/[、,，・\n]+/).map(x=>x.trim()).filter(Boolean).forEach(t=>addTok(t,rows,sv));
+CX={nm:nm||"自作料理",rows,b:!!b,sv};renderCalc()}
+function sumR(rows){const t=[0,0,0,0,0,0];rows.forEach(r=>(r.d?r.d.map(x=>x*r.g/100).concat([(SALT[r.n]||0)*r.g/100,(FIB[r.n]||0)*r.g/100]):r.tot.concat([0,0])).forEach((x,j)=>t[j]+=x));return t.map(x=>x/((CX&&CX.sv)||1))}
+function setG(i,v){CX.rows[i].g=+v||0;renderCalc()}function setT(i,j,v){CX.rows[i].tot[j]=+v||0;renderCalc()}function delRow(i){CX.rows.splice(i,1);renderCalc()}
+function addIng(){const v=$("ai").value.trim();if(v){v.split(/[、,，・]+/).filter(Boolean).forEach(t=>addTok(t.trim(),CX.rows,CX.sv));renderCalc()}}
+function addCalc(){const t=sumR(CX.rows),pi=Math.min(S.cur,S.p.length-1);add(pi,{n:CX.nm+"（1食分）",k:t[0],p:t[1],f:t[2],c:t[3],s:t[4],fb:t[5]});S.tab=2;save();go()}
+function saveMy(){const t=sumR(CX.rows),nm=$("sn").value.trim()||CX.nm;CX.nm=nm;const o={n:nm,k:R(t[0]),p:R(t[1]),f:R(t[2]),c:R(t[3]),s:+t[4].toFixed(1),fb:+t[5].toFixed(1),rows:JSON.parse(JSON.stringify(CX.rows)),sv:CX.sv||1},i=S.my.findIndex(x=>x.n==nm);if(i>=0)S.my[i]=o;else S.my.push(o);save();renderMy();renderCalc()}
+function addMy(i){const x=S.my[i],pi=Math.min(S.cur,S.p.length-1);add(pi,{n:x.n,k:x.k,p:x.p,f:x.f,c:x.c,s:x.s,fb:x.fb},1);S.tab=2;save();go()}
+function delMy(i){S.my.splice(i,1);save();renderMy()}
+function vCook(){$("v").innerHTML=who()+`<div class="card"><h2>料理の栄養を計算</h2><div class="sub">料理名と食材から、1食分のkcalとたんぱく質・脂質・炭水化物を概算します。食材は「、」区切りで、量は「ベーコン50g」「卵2個」のように書けます（省略すると標準量）。</div>
+<label style="margin-top:8px">料理名</label><input id="dn" placeholder="例：カルボナーラ">
+<label style="margin-top:8px">食材（追加分）</label><input id="di" placeholder="例：ベーコン、小松菜、舞茸">
+<label style="margin-top:8px">何食分を作る？（作り置きの全量。1食分なら1）</label><input id="dv" type="number" inputmode="numeric" value="1"><button class="btn" style="width:100%;margin-top:8px" onclick="calc()">計算する</button></div><div id="mc"></div><div id="rs"></div><div id="my"></div><div id="mf"></div>`;renderMC();renderCalc();renderMy();renderMF()}
+function renderMC(){const pi=Math.min(S.cur,S.p.length-1),t=T(S.p[pi]),w=W4[S.rm],k=t.k*w;
+$("mc").innerHTML=`<div class="card"><h2>目安を見る食事 <span class="sub">（保存には影響しません）</span></h2><div class="chips">${MN4.map((n,m)=>`<button class="chip ${S.rm==m?'on':''}" onclick="S.rm=${m};save();renderMC();renderCalc()">${n}</button>`).join("")}</div>
+<div class="note"><b>${MN4[S.rm]}の目安</b>（${E(S.p[pi].n||'あなた')}）<br>エネルギー ${R(k*.9)}〜${R(k*1.1)} kcal<br>たんぱく質 ${R(t.p*w*.85)}〜${R(t.p*w*1.15)} g<br>脂質 ${R(k*.2/9)}〜${R(k*.3/9)} g<br>炭水化物 ${R(k*.5/4)}〜${R(k*.65/4)} g</div>
+<div class="sub">脂質は総カロリーの20〜30%、炭水化物は50〜65%が一般的な範囲です。</div></div>`}
+function renderCalc(){const el=$("rs");if(!CX){el.innerHTML="";return}
+const pi=Math.min(S.cur,S.p.length-1),t=T(S.p[pi]),w=W4[S.rm],k=t.k*w,tot=sumR(CX.rows);
+const rows=CX.rows.map((r,i)=>r.d?`<div class="meal"><div style="flex:1"><b>${E(r.n)}</b><span class="sub">${R(r.d[0]*r.g/100)}kcal${r.b?'（基本の量）':''}</span></div><div style="width:84px"><input type="number" inputmode="decimal" value="${r.g}" onchange="setG(${i},this.value)"></div><span class="sub">g</span><button class="btn s sm" onclick="delRow(${i})">×</button></div>`
+:`<div class="meal" style="display:block"><div class="row"><b>${E(r.n)}</b><button class="btn s sm" onclick="delRow(${i})">×</button></div><div class="note">データにない食材です。1食分のkcalと各栄養素を入力してください。</div><div class="g"><input type="number" inputmode="decimal" placeholder="kcal" value="${r.tot[0]||''}" onchange="setT(${i},0,this.value)"><input type="number" inputmode="decimal" placeholder="たんぱく質g" value="${r.tot[1]||''}" onchange="setT(${i},1,this.value)"><input type="number" inputmode="decimal" placeholder="脂質g" value="${r.tot[2]||''}" onchange="setT(${i},2,this.value)"><input type="number" inputmode="decimal" placeholder="炭水化物g" value="${r.tot[3]||''}" onchange="setT(${i},3,this.value)"></div></div>`).join("");
+const js=[["エネルギー",tot[0],k*.9,k*1.1,"kcal"],["たんぱく質",tot[1],t.p*w*.85,t.p*w*1.15,"g"],["脂質",tot[2],k*.2/9,k*.3/9,"g"],["炭水化物",tot[3],k*.5/4,k*.65/4,"g"]];
+el.innerHTML=`<div class="card"><h2>${E(CX.nm)}　1食分</h2><div class="big">${R(tot[0])}<span class="sub"> kcal</span></div><div class="sub">${pfc(tot[1],tot[2],tot[3])}</div><div class="sub">塩分 ${tot[4].toFixed(1)}g・食物繊維 ${tot[5].toFixed(1)}g</div>
+${js.map(([l,v,lo,hi,u])=>{const j=v<lo?"少なめ":v>hi?"多め":"範囲内";return`<div class="row" style="padding:3px 0"><span>${l} ${R(v)}${u}</span><span style="color:${j=="範囲内"?'var(--ac)':'var(--hot)'};font-weight:700">${MN4[S.rm]}の目安で${j}</span></div>`}).join("")}
+<div class="note">${CX.b?'油・調味料を含む「基本の量」で計算しています。':'基本レシピが無い料理なので、入れた食材だけの合計です。油や調味料も食材に足すと精度が上がります。'}グラムを直すと再計算されます。</div>
+<label style="margin-top:8px">何食分？（全体の合計をこの数で割ります）</label><input type="number" inputmode="numeric" value="${CX.sv||1}" onchange="CX.sv=Math.max(1,+this.value||1);renderCalc()"><h2 style="margin-top:10px">材料（${(CX.sv||1)>1?'全体':'1食分'}のg）</h2>${rows}
+<div class="row" style="margin-top:8px"><input id="ai" placeholder="食材を追加 例：ささみ80g"><button class="btn s" style="white-space:nowrap" onclick="addIng()">追加</button></div>
+<label style="margin-top:10px">保存する名前（似た料理は別の名前で保存できます）</label><input id="sn" value="${E(CX.nm)}" onchange="CX.nm=this.value.trim()||'自作料理'"><div class="g" style="margin-top:8px"><button class="btn" onclick="saveMy()">${S.my.some(x=>x.n==CX.nm)?'上書き保存':'マイ料理に保存'}</button><button class="btn s" onclick="addCalc()">${MN4[S.rm]}にも記録</button></div></div>`}
+function renderMy(){$("my").innerHTML=S.my.length?`<div class="card"><h2>マイ料理（${S.my.length}件）</h2><div class="sub">記録タブで料理名を入れると呼び出せます。「編集」で材料を変えて別名で保存すれば、似た料理を増やせます。</div>${S.my.map((x,i)=>`<div class="meal"><div><b>${E(x.n)}</b><span class="sub">${x.k}kcal・${pfc(x.p,x.f,x.c)}</span></div><div><button class="btn s sm" onclick="editMy(${i})">編集</button> <button class="btn s sm" onclick="delMy(${i})">削除</button></div></div>`).join("")}</div>`:''}
+function editMy(i){const x=S.my[i];CX={nm:x.n,b:0,sv:x.sv||1,rows:x.rows?JSON.parse(JSON.stringify(x.rows)):[{n:x.n,g:0,tot:[x.k,x.p,x.f,x.c]}]};$("dn").value=x.n;renderCalc();$("rs").scrollIntoView()}
+function saveMi(){const g=v=>+$(v).value||0,n=$("xn").value.trim(),a=g("xa")||100;if(!n||!g("xk"))return alert("名前とkcalを入力してください");S.mi=S.mi.filter(x=>x.n!=n);S.mi.push({n,d:[g("xk"),g("xp"),g("xf"),g("xc")].map(x=>x*100/a),g:a,al:[]});save();renderMF()}
+function delMi(i){S.mi.splice(i,1);save();renderMF()}
+function saveDirect(){const g=v=>+$(v).value||0,n=$("yn").value.trim();if(!n||!g("yk"))return alert("名前とkcalを入力してください");S.my=S.my.filter(x=>x.n!=n);S.my.push({n,k:g("yk"),p:g("yp"),f:g("yf"),c:g("yc")});save();renderMy();renderMF()}
+const NI=(id,ph)=>`<input id="${id}" type="number" inputmode="decimal" placeholder="${ph}">`;
+function renderMF(){$("mf").innerHTML=`<div class="card"><h2>マイ食材を登録</h2><div class="sub">プロテイン・グラノーラなど。パッケージの栄養成分表示を、表示どおりに入力します。登録すると、食材欄に名前を書くだけで使えます（例：プロテイングラノーラ30g、ベイクドオーツsoy30g のように混ぜた量も計算可能）。</div>
+<label style="margin-top:8px">食材名</label><input id="xn" placeholder="例：プロテイングラノーラ"><label style="margin-top:6px">表示の量（g）</label><input id="xa" type="number" inputmode="decimal" value="100">
+<div class="g" style="margin-top:6px">${NI("xk","kcal")}${NI("xp","たんぱく質g")}${NI("xf","脂質g")}${NI("xc","炭水化物g")}</div><button class="btn" style="width:100%;margin-top:8px" onclick="saveMi()">食材を登録</button>
+${S.mi.map((x,i)=>`<div class="meal"><div><b>${E(x.n)}</b><span class="sub">${R(x.g)}gで${R(x.d[0]*x.g/100)}kcal</span></div><button class="btn s sm" onclick="delMi(${i})">削除</button></div>`).join("")}</div>
+<div class="card"><h2>マイ料理を数値で直接登録</h2><div class="sub">栄養が分かっている1食分を、食事の区分なしで登録できます。</div><label style="margin-top:8px">料理名</label><input id="yn"><div class="g" style="margin-top:6px">${NI("yk","kcal")}${NI("yp","たんぱく質g")}${NI("yf","脂質g")}${NI("yc","炭水化物g")}</div><button class="btn" style="width:100%;margin-top:8px" onclick="saveDirect()">マイ料理に登録</button></div>`}
+function sug(){const q=$("fn").value.trim().toLowerCase(),el=$("sg");if(!q){el.innerHTML="";return}const m=S.my.map((x,i)=>[x,i]).filter(([x])=>x.n.toLowerCase().includes(q)).slice(0,6);
+el.innerHTML=m.length?m.map(([x,i])=>`<div class="meal"><div><b>${E(x.n)}</b><span class="sub">${x.k}kcal・${pfc(x.p,x.f,x.c)}</span></div><button class="btn sm" onclick="addMy(${i})">${MN4[S.rm]}に追加</button></div>`).join(""):`<div class="note">マイ料理に該当なし。下に栄養を入れて追加するか、<a href="#" onclick="S.tab=3;save();go();return false">料理タブで計算・登録</a>できます。</div>`}
+function bkOut(){const t=$("bk");t.value=JSON.stringify(S);t.select();try{navigator.clipboard.writeText(t.value)}catch(e){}}
+function bkIn(){try{const o=JSON.parse($("bk").value);if(!o.p)throw 0;S=norm(o);save();prune();vSet();alert("読み込みました")}catch(e){alert("読み込めませんでした")}}
+const dd=i=>{if(i<1000)return D[i];const x=S.my[i-1000];return[x.n,"m",x.k,x.p,x.f,x.c,"",(x.rows||[]).map(r=>r.n),x.s||0,x.fb||0]};
+const pk=k=>{const q=k.split("-");return new Date(q[0],q[1]-1,q[2]).getTime()};
+function dayS(pi,o){const k=key(-o),a=(S.log[k]||{})[pi];return a?sum(a):((S.hist[k]||{})[pi]||null)}
+function weekCard(pi,t){const ds=[1,2,3,4,5,6,7].map(o=>dayS(pi,o)).filter(x=>x&&x.k>0),n=ds.length;if(!n)return"";const av=f=>ds.reduce((s,x)=>s+x[f],0)/n;
+return`<div class="card"><h2>直近7日のまとめ</h2><div class="sub">記録のある日：${n}日</div>${bar("平均エネルギー",av("k"),t.k,"kcal")}${bar("平均たんぱく質",av("p"),t.p,"g")}<div class="sub">目標±10%の日：${ds.filter(x=>x.k>=t.k*.9&&x.k<=t.k*1.1).length}日／たんぱく質90%以上の日：${ds.filter(x=>x.p>=t.p*.9).length}日</div></div>`}
+function wtCard(pi){const e=Object.keys(S.wt).filter(k=>S.wt[k][pi]).filter(k=>pk(k)>=Date.now()-S.cr*864e5).sort((a,b)=>pk(a)-pk(b)).map(k=>[k,S.wt[k][pi]]);let g="";
+if(e.length>1){const v=e.map(x=>x[1]),lo=Math.min(...v)-.5,hi=Math.max(...v)+.5,X=i=>10+i*280/(e.length-1),Y=w=>80-(w-lo)/(hi-lo)*70,L=e[e.length-1],df=L[1]-e[0][1];
+g=`<svg viewBox="0 0 300 90" style="width:100%"><polyline points="${e.map((x,i)=>X(i)+","+Y(x[1])).join(" ")}" fill="none" style="stroke:var(--ac)" stroke-width="2"/>${e.map((x,i)=>`<circle cx="${X(i)}" cy="${Y(x[1])}" r="3" style="fill:var(--hot)"/>`).join("")}</svg><div class="row sub"><span>${e[0][0]} ${e[0][1]}kg</span><span>${L[0]} ${L[1]}kg（${df>0?"+":""}${df.toFixed(1)}）</span></div>`}
+return`<div class="card"><h2>体重</h2>${g||'<div class="sub">2回以上記録するとグラフが出ます。</div>'}<div class="row" style="margin-top:8px"><input id="wv" type="number" inputmode="decimal" step="0.1" placeholder="今日の体重 kg"><button class="btn" style="white-space:nowrap" onclick="wtAdd(${pi})">記録</button></div><div class="sub">記録すると目標カロリーの計算にも反映されます。</div></div>`}
+function wtAdd(pi){const v=+$("wv").value;if(!(v>=15&&v<=250))return alert("15〜250kgで入力してください");(S.wt[key(0)]=S.wt[key(0)]||{})[pi]=v;S.p[pi].w=v;save();vLog()}
+function wipe(){if(confirm("全データを削除します。元に戻せません。")){try{localStorage.removeItem("gohan")}catch(e){}S=norm(null);go()}}
+function norm(o){const d={p:[Object.assign(np(),{n:"自分"})],mode:"d",days:3,seed:1,cur:0,log:{},eaten:{},hist:{},wt:{},ov:{},cr:30,md:[],ls:true,my:[],mi:[],pin:["","",""],rm:0,amt:1,tab:0};if(!o||typeof o!="object")return d;
+const n=x=>+x||0,t=x=>String(x==null?"":x).slice(0,60),ob=x=>x&&typeof x=="object"&&!Array.isArray(x)?x:{},ar=x=>Array.isArray(x)?x:[],dk=k=>/^\d{4}-\d{1,2}-\d{1,2}$/.test(k);
+if(ar(o.p).length)d.p=o.p.slice(0,8).map(q=>{q=ob(q);const b=np();return{n:t(q.n),sex:q.sex=="m"?"m":"f",age:n(q.age)||b.age,h:n(q.h)||b.h,w:n(q.w)||b.w,act:ACT[q.act]?+q.act:1.375,goal:GO[q.goal]?q.goal:"n",ex:t(q.ex),gw:Math.min(250,Math.max(0,n(q.gw))),gk:Math.min(104,Math.max(0,n(q.gk)))}});
+d.mode=MO[o.mode]?o.mode:"d";d.days=[1,3,5,7].includes(o.days)?o.days:3;d.seed=n(o.seed)||1;d.cur=Math.min(d.p.length-1,Math.max(0,n(o.cur)));d.tab=Math.min(4,Math.max(0,n(o.tab)));d.rm=[0,1,2,3].includes(o.rm)?o.rm:0;d.amt=[.5,.7,1,1.3,2].includes(o.amt)?o.amt:1;
+d.cr=[30,90,365].includes(o.cr)?o.cr:30;d.md=Array.isArray(o.md)?o.md.filter((x,i,a)=>(x=="q"||x=="b")&&a.indexOf(x)==i):(o.mode=="q"?["q"]:o.mode=="b"?["b"]:[]);d.ls=o.ls!==false;for(const k in ob(o.ov))if(dk(k)){d.ov[k]={};for(const m in ob(o.ov[k]))if([0,1,2].includes(+m)){const i=n(o.ov[k][m]);if(i>=0&&i<D.length)d.ov[k][+m]=i}}
+const ent=e=>{e=ob(e);return{n:t(e.n),m:e.m==null?null:n(e.m),pl:e.pl?1:0,k:n(e.k),p:n(e.p),f:n(e.f),c:n(e.c),s:n(e.s),fb:n(e.fb)}};
+for(const k in ob(o.log))if(dk(k)){d.log[k]={};for(const j in ob(o.log[k]))d.log[k][+j]=ar(o.log[k][j]).slice(0,100).map(ent)}
+for(const k in ob(o.eaten))if(dk(k)){d.eaten[k]={};for(const j in ob(o.eaten[k]))d.eaten[k][+j]=Object.fromEntries([0,1,2].filter(m=>ob(o.eaten[k][j])[m]).map(m=>[m,1]))}
+for(const k in ob(o.hist))if(dk(k)){d.hist[k]={};for(const j in ob(o.hist[k])){const h=ob(o.hist[k][j]);d.hist[k][+j]={k:n(h.k),p:n(h.p),f:n(h.f),c:n(h.c),s:n(h.s),fb:n(h.fb)}}}
+for(const k in ob(o.wt))if(dk(k)){d.wt[k]={};for(const j in ob(o.wt[k])){const v=n(o.wt[k][j]);if(v>=15&&v<=250)d.wt[k][+j]=v}}
+d.my=ar(o.my).slice(0,300).map(x=>{x=ob(x);const r={n:t(x.n),k:n(x.k),p:n(x.p),f:n(x.f),c:n(x.c),s:n(x.s),fb:n(x.fb)};if(ar(x.rows).length){r.rows=x.rows.slice(0,40).map(y=>{y=ob(y);const q={n:t(y.n),g:n(y.g)};if(ar(y.d).length==4)q.d=y.d.map(n);else q.tot=[0,1,2,3].map(i=>n(ar(y.tot)[i]));if(y.b)q.b=1;return q});r.sv=Math.max(1,n(x.sv)||1)}return r}).filter(x=>x.n);
+d.mi=ar(o.mi).slice(0,300).map(x=>{x=ob(x);return{n:t(x.n),d:[0,1,2,3].map(i=>n(ar(x.d)[i])),g:n(x.g)||100,al:[]}}).filter(x=>x.n);d.pin=[0,1,2].map(m=>t(ar(o.pin)[m]));return d}
+// 買い物
+function tgM(k){const i=S.md.indexOf(k);i>=0?S.md.splice(i,1):S.md.push(k);save();vSet()}
+function planO(){const P=plan();P.forEach((r,o)=>{const v=S.ov[key(o)];if(v)for(const m in v)r[m]=v[m]});return P}
+function sw(o,m){const P=planO(),ex=S.p.flatMap(p=>(p.ex||"").split(/[、,，\s]+/).filter(Boolean)),t=m?"m":"b",c=D.map((d,i)=>i).filter(i=>D[i][1]==t&&!P[o].includes(i)&&!ex.some(k=>D[i][0].includes(k)||D[i][7].some(g=>g.includes(k))));if(!c.length)return alert("候補がありません");const k=key(o);(S.ov[k]=S.ov[k]||{})[m]=c[Math.floor(Math.random()*c.length)];save();vPlan()}
+function swr(o,m){delete(S.ov[key(o)]||{})[m];save();vPlan()}
+const RN={30:"1か月",90:"3か月",365:"1年"};
+function kcCard(pi,t){const N=S.cr,v=[];for(let o=N-1;o>=0;o--){const d=dayS(pi,o);v.push(d?d.k:0)}const mx=Math.max(t.k*1.3,...v),w=280/N,ty=90-t.k/mx*80;
+return`<div class="card"><h2>カロリーの推移</h2><div class="chips">${[30,90,365].map(n=>`<button class="chip ${S.cr==n?'on':''}" onclick="S.cr=${n};save();vLog()">${RN[n]}</button>`).join("")}</div><svg viewBox="0 0 300 100" style="width:100%">${v.map((x,i)=>x?`<rect x="${10+i*w}" y="${90-x/mx*80}" width="${Math.max(w-.5,1)}" height="${x/mx*80}" style="fill:${x>t.k*1.1?'var(--hot)':'var(--ac)'}"/>`:'').join("")}<line x1="10" x2="290" y1="${ty}" y2="${ty}" stroke-dasharray="4" style="stroke:var(--sub)"/></svg><div class="sub">点線＝目標 ${R(t.k)}kcal／赤＝目標の10%超／記録のない日は空白（体重グラフも同じ期間）</div></div>`}
+function bkFile(){const b=new Blob([JSON.stringify(S)],{type:"application/json"}),a=document.createElement("a"),d=ds(0);a.href=URL.createObjectURL(b);a.download="gohan-backup-"+d.getFullYear()+("0"+(d.getMonth()+1)).slice(-2)+("0"+d.getDate()).slice(-2)+".json";a.click()}
+function bkF(el){const f=el.files[0];if(!f||f.size>5e6)return alert("ファイルを確認してください");const r=new FileReader();r.onload=()=>{$("bk").value=r.result;bkIn()};r.readAsText(f)}
+function vShop(){const P=planO(),c={},dc={};
+for(let o=0;o<S.days;o++)P[o].forEach((di,m)=>{const x=dd(di);dc[x[0]]=(dc[x[0]]||0)+1;const my=di>=1000?S.my[di-1000]:null,L=my?(my.rows||[]).map(r=>[r.n,r.g/(my.sv||1)]):D[di][7].map(n=>{const q=find(n);return[n,q?q.g:40]});
+S.p.forEach(p=>{const f=scale(x,T(p).k*W[m]);L.forEach(([n,g])=>{const e=c[n]=c[n]||{g:0,n:0};e.g+=g*f;e.n++})})});
+$("v").innerHTML=`<div class="chips">${[1,3,5,7].map(n=>`<button class="chip ${S.days==n?'on':''}" onclick="S.days=${n};save();vShop()">${n}日分</button>`).join("")}</div>
+<div class="card"><h2>買い物リスト（${S.p.length}人分）</h2><div class="sub">人ごとの量を反映した概算です。調味料・加工品は目安量なので、家にある分を引いてください。</div>${Object.entries(c).sort((a,b)=>b[1].g-a[1].g).map(([g,v])=>`<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:15px;padding:3px 0"><input type="checkbox" style="width:auto">${E(g)}<span class="sub" style="margin-left:auto">${v.g>0?(g=="卵"?"約"+Math.ceil(v.g/50)+"個":"約"+Math.max(10,Math.round(v.g/10)*10)+"g"):"×"+v.n}</span></label>`).join("")}</div>
+<div class="card"><h2>作るメニュー</h2><ul>${Object.entries(dc).map(([k,n])=>`<li>${E(k)}${n>1?' ×'+n:''}</li>`).join("")}</ul>${S.md.includes("b")?'<div class="note">作り置きモード：同じメニューを複数日で回すので、まとめて調理して小分け冷蔵・冷凍がおすすめです。</div>':''}</div>`}
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+prune();save();go();
+</script></body></html>
